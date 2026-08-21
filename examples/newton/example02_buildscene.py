@@ -43,12 +43,13 @@ def main() -> None:
     import isaaclab.sim as sim_utils
     from isaaclab.assets import RigidObject, RigidObjectCfg
     from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
-    from isaaclab_newton.physics import MJWarpSolverCfg, NewtonCfg
+    from isaaclab_newton.physics import MJWarpSolverCfg, NewtonCfg, NewtonShapeCfg
     from isaaclab.sim import SimulationCfg, build_simulation_context
     from pxr import UsdGeom
 
     physics_cfg = NewtonCfg(
         solver_cfg=MJWarpSolverCfg(solver="newton", integrator="implicitfast"),
+        default_shape_cfg=NewtonShapeCfg(margin=0.0, gap=0.0),
         num_substeps=5,
     )
     assert args_cli.log_every > 0, "--log_every 必须为正整数。"
@@ -68,14 +69,29 @@ def main() -> None:
             UsdGeom.SetStageUpAxis(sim.stage, UsdGeom.Tokens.z)
             sim.set_camera_view(eye=camera_eye, target=camera_target)
 
+        # PhysX contactOffset is converted to Newton shape_gap. Explicitly
+        # remove it so contacts become active at the geometric surface.
+        hard_collision_cfg = sim_utils.CollisionPropertiesCfg(
+            contact_offset=0.0,
+            rest_offset=0.0,
+        )
+        hard_contact_material = sim_utils.PhysxRigidBodyMaterialCfg(
+            static_friction=1.0,
+            dynamic_friction=1.0,
+            restitution=0.0,
+            compliant_contact_stiffness=1.0e6,
+            compliant_contact_damping=2.0e3,
+        )
+
         table = RigidObject(
             RigidObjectCfg(
                 prim_path="/World/Table",
                 spawn=sim_utils.CuboidCfg(
                     size=(1.2, 1.2, 0.1),
                     rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),
-                    collision_props=sim_utils.CollisionPropertiesCfg(),
+                    collision_props=hard_collision_cfg,
                     visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.2, 0.2, 0.2)),
+                    physics_material=hard_contact_material,
                 ),
                 init_state=RigidObjectCfg.InitialStateCfg(pos=(0.0, 0.0, -0.05)),
             )
@@ -85,6 +101,8 @@ def main() -> None:
                 prim_path="/World/CrackerBox",
                 spawn=sim_utils.UsdFileCfg(
                     usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/YCB/Axis_Aligned_Physics/003_cracker_box.usd",
+                    collision_props=hard_collision_cfg,
+                    physics_material=hard_contact_material,
                 ),
                 init_state=RigidObjectCfg.InitialStateCfg(pos=(0.0, 0.0, 0.8)),
             )
