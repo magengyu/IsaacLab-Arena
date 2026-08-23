@@ -7,9 +7,7 @@
 
 使用方法：
 
-    .venv/bin/python examples/newton/example02_buildscene.py --viz newton
-    .venv/bin/python examples/newton/example02_buildscene.py --viz kit
-    .venv/bin/python examples/newton/example02_buildscene.py --viz none
+    .venv/bin/python examples/newton/example02_buildscene.py --viz [newton, kit, rerun, viser, none]
 """
 
 import argparse
@@ -143,7 +141,6 @@ def main() -> None:
                     f"x={position[0]:+.5f}, y={position[1]:+.5f}, z={position[2]:+.5f}",
                     flush=True,
                 )
-            print(f"[INFO] 已完成第 {step:04d} 个 Newton 物理步。", flush=True)
             time.sleep(sim.get_physics_dt())
 
         print("[INFO] Newton 仿真结束。", flush=True)
