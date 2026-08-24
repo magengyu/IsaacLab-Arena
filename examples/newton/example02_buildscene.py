@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-"""最小 Newton 刚体仿真：一个 YCB 饼干盒落到静态台面上，并用 Newton viewer 显示。
+"""Newton 刚体仿真：本地水壶和目标容器置于静态台面上。
 
 使用方法：
 
@@ -17,8 +17,8 @@ import time
 from isaaclab.app import AppLauncher
 
 
-parser = argparse.ArgumentParser(description="Newton 最小刚体场景示例。")
-parser.add_argument("--log_every", type=int, default=1, help="每隔多少物理步打印一次饼干盒位置。")
+parser = argparse.ArgumentParser(description="Newton 水壶与容器场景示例。")
+parser.add_argument("--log_every", type=int, default=1000, help="每隔多少物理步打印一次水壶位置。")
 AppLauncher.add_app_launcher_args(parser)
 parser.set_defaults(visualizer=["newton"], device="cuda:0")
 args_cli = parser.parse_args()
@@ -40,7 +40,6 @@ def main() -> None:
 
     import isaaclab.sim as sim_utils
     from isaaclab.assets import RigidObject, RigidObjectCfg
-    from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
     from isaaclab_newton.physics import MJWarpSolverCfg, NewtonCfg, NewtonShapeCfg
     from isaaclab.sim import SimulationCfg, build_simulation_context
     from pxr import UsdGeom
@@ -59,8 +58,8 @@ def main() -> None:
         add_lighting=True,
         visualizers=visualizers,
     ) as sim:
-        camera_eye = (2.0, -2.0, 1.5)
-        camera_target = (0.0, 0.0, 0.3)
+        camera_eye = (1.6, -1.6, 1.2)
+        camera_target = (0.45, 0.0, 0.1)
 
         def set_z_up_camera() -> None:
             """Set the interactive camera with the world Z axis pointing upward."""
@@ -94,21 +93,38 @@ def main() -> None:
                 init_state=RigidObjectCfg.InitialStateCfg(pos=(0.0, 0.0, -0.05)),
             )
         )
-        cracker_box = RigidObject(
+        jug = RigidObject(
             RigidObjectCfg(
-                prim_path="/World/CrackerBox",
+                prim_path="/World/FStyleJug",
                 spawn=sim_utils.UsdFileCfg(
-                    usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/YCB/Axis_Aligned_Physics/003_cracker_box.usd",
+                    usd_path="/home/magengyu/IsaacLab-Arena/scene/fstylejug_a01/fstylejug_a01_inst_physx.usd",
                     collision_props=hard_collision_cfg,
                     physics_material=hard_contact_material,
                 ),
-                init_state=RigidObjectCfg.InitialStateCfg(pos=(0.0, 0.0, 0.8)),
+                init_state=RigidObjectCfg.InitialStateCfg(pos=(0.45, -0.25, 0.01)),
+            )
+        )
+        container = RigidObject(
+            RigidObjectCfg(
+                prim_path="/World/TargetContainer",
+                spawn=sim_utils.UsdFileCfg(
+                    usd_path=(
+                        "/home/magengyu/IsaacLab-Arena/scene/Container_B04_40x30x12cm/"
+                        "Container_B04_40x30x12cm_PR_V_NVD_01.usd"
+                    ),
+                    scale=(0.01, 0.01, 0.01),
+                    rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True, disable_gravity=True),
+                    collision_props=hard_collision_cfg,
+                    physics_material=hard_contact_material,
+                ),
+                init_state=RigidObjectCfg.InitialStateCfg(pos=(0.45, 0.22, 0.0)),
             )
         )
 
         sim.reset()
         table.reset()
-        cracker_box.reset()
+        jug.reset()
+        container.reset()
         # Kit/RTX creates its viewport resources during reset/render. Apply the
         # camera afterwards so its Z-up roll is not replaced by the startup pose.
         sim.render()
@@ -124,7 +140,8 @@ def main() -> None:
                 print(f"[INFO] visualizer 在第 {step} 步前关闭。", flush=True)
                 break
             table.write_data_to_sim()
-            cracker_box.write_data_to_sim()
+            jug.write_data_to_sim()
+            container.write_data_to_sim()
             sim.step()
             if step == 0:
                 # Newton's deferred CUDA graph and Cubric/Fabric synchronization
@@ -132,12 +149,13 @@ def main() -> None:
                 set_z_up_camera()
                 sim.render()
             table.update(sim.get_physics_dt())
-            cracker_box.update(sim.get_physics_dt())
+            jug.update(sim.get_physics_dt())
+            container.update(sim.get_physics_dt())
             step += 1
             if step % args_cli.log_every == 0:
-                position = cracker_box.data.root_pos_w.torch[0].detach().cpu().tolist()
+                position = jug.data.root_pos_w.torch[0].detach().cpu().tolist()
                 print(
-                    f"[INFO] step={step:04d}, CrackerBox 世界坐标: "
+                    f"[INFO] step={step:04d}, 水壶世界坐标: "
                     f"x={position[0]:+.5f}, y={position[1]:+.5f}, z={position[2]:+.5f}",
                     flush=True,
                 )

@@ -10,9 +10,9 @@ Newton 物理后端。
 
 使用方法：
 
-    .venv/bin/python examples/newton/example04_arena_env.py
-    .venv/bin/python examples/newton/example04_arena_env.py --viz kit
-    .venv/bin/python examples/newton/example04_arena_env.py --viz none
+    .venv/bin/python examples/newton/example05_ABB.py
+    .venv/bin/python examples/newton/example05_ABB.py --viz kit
+    .venv/bin/python examples/newton/example05_ABB.py --viz none
 
 注意：使用 `--viz kit` 可打开 Isaac Sim 可视化窗口。
 """
@@ -47,6 +47,8 @@ simulation_app = app_launcher.app
 
 def main() -> None:
     """Create a Arena scene and step it with zero actions."""
+    from isaaclab_arena.assets.object import Object
+    from isaaclab_arena.assets.object_base import ObjectType
     from isaaclab_arena.assets.registries import AssetRegistry
     from isaaclab_arena.embodiments.no_embodiment import NoEmbodiment
     from isaaclab_arena.environments.arena_env_builder import ArenaEnvBuilder
