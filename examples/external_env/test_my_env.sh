@@ -15,7 +15,7 @@ PYTHONPATH="$(pwd)${PYTHONPATH:+:$PYTHONPATH}" .venv/bin/python isaaclab_arena/e
 
 
 PYTHONPATH="$(pwd)${PYTHONPATH:+:$PYTHONPATH}" .venv/bin/python isaaclab_arena/evaluation/policy_runner.py \
-  --policy_type random_action \
+  --policy_type zero_action \
   --num_steps 5000 \
   --viz kit \
   --external_environment_class_path examples.external_env.franka_table_env:ExternalFrankaTableEnvironment \
@@ -25,9 +25,19 @@ PYTHONPATH="$(pwd)${PYTHONPATH:+:$PYTHONPATH}" .venv/bin/python isaaclab_arena/e
 
 PYTHONPATH="$(pwd)${PYTHONPATH:+:$PYTHONPATH}" .venv/bin/python isaaclab_arena/evaluation/policy_runner.py \
   --policy_type random_action \
-  --num_steps 20 \
+  --num_steps 20000 \
   --viz kit \
   --presets newton \
   --print_actions \
   --external_environment_class_path examples.external_env.franka_ABB_env:FrankaAbbFlexiblePackingEnvironment \
   franka_abb_flexible_packing
+
+
+PYTHONPATH="$(pwd)${PYTHONPATH:+:$PYTHONPATH}" .venv/bin/python isaaclab_arena/evaluation/policy_runner.py \
+  --policy_type random_action \
+  --num_steps 20000 \
+  --viz kit \
+  --enable_cameras \
+  --print_actions \
+  --external_environment_class_path examples.external_env.franka_ABB_env:FrankaAbbFlexiblePackingEnvironment \
+  franka_abb_flexible_packing  

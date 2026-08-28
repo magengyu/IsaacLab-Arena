@@ -8,7 +8,7 @@
 运行：
     PYTHONPATH="$(pwd)${PYTHONPATH:+:$PYTHONPATH}" .venv/bin/python isaaclab_arena/evaluation/policy_runner.py \
       --policy_type zero_action \
-      --num_steps 200 \
+      --num_steps 20000 \
       --viz kit \
       --external_environment_class_path \
       examples.external_env.franka_ABB_env:FrankaAbbFlexiblePackingEnvironment \
@@ -46,7 +46,6 @@ _JUG_SLOT_HALF_RANGE_M = 0.03
 def _register_newton_visual_mesh_callback() -> None:
     """Make the jug's visual-only meshes visible in the Newton visualizer."""
     import newton
-
     from isaaclab.physics import PhysicsEvent
     from isaaclab_newton.physics import NewtonManager
 
@@ -109,6 +108,22 @@ def _enable_absolute_ik_target_visualization(embodiment) -> None:
     embodiment.action_config.arm_action.class_type = VisualizedDifferentialInverseKinematicsAction
 
 
+def _enable_newton_franka_gravity_compensation(embodiment) -> None:
+    """Keep Franka gravity enabled and route MuJoCo compensation through its actuators."""
+    from isaaclab_newton.sim.schemas import MujocoJointDrivePropertiesCfg, MujocoRigidBodyPropertiesCfg
+
+    robot = embodiment.scene_config.robot
+    assert robot is not None, "Franka embodiment 未配置 robot articulation。"
+    existing_rigid_props = robot.spawn.rigid_props
+    robot.spawn.rigid_props = MujocoRigidBodyPropertiesCfg(
+        rigid_body_enabled=existing_rigid_props.rigid_body_enabled,
+        kinematic_enabled=existing_rigid_props.kinematic_enabled,
+        disable_gravity=False,
+        gravcomp=1.0,
+    )
+    robot.spawn.joint_drive_props = MujocoJointDrivePropertiesCfg(actuatorgravcomp=True)
+
+
 class FrankaAbbFlexiblePackingEnvironment(ExampleEnvironmentBase):
     """Build a Franka flexible-packing scene on a flat plane."""
 
@@ -157,8 +172,8 @@ class FrankaAbbFlexiblePackingEnvironment(ExampleEnvironmentBase):
                             y_center + _JUG_SLOT_HALF_RANGE_M,
                             0.25,
                         ),
-                        rpy_min=(-1.0, -1.0, -math.pi),
-                        rpy_max=(1.0, 1.0, math.pi),
+                        rpy_min=(0.0, 0.0, -math.pi),
+                        rpy_max=(0.0, 0.0, math.pi),
                     ),
                     spawn_cfg_addon={"collision_props": collision_props, "physics_material": contact_material},
                 )
@@ -173,7 +188,10 @@ class FrankaAbbFlexiblePackingEnvironment(ExampleEnvironmentBase):
         )
         light = self.asset_registry.get_asset_by_name("light")()
         directional_light = self.asset_registry.get_asset_by_name("directional_light")()
-        embodiment = self.asset_registry.get_asset_by_name("franka_ik")()
+        embodiment = self.asset_registry.get_asset_by_name("franka_ik")(enable_cameras=args_cli.enable_cameras)
+        teleop_device = self.device_registry.get_device_by_name(args_cli.teleop_device)()
+        if getattr(args_cli, "presets", None) == "newton":
+            _enable_newton_franka_gravity_compensation(embodiment)
         _enable_absolute_ik_target_visualization(embodiment)
 
         scene = Scene(assets=[flat_plane, *jugs, container, light, directional_light])
@@ -182,8 +200,16 @@ class FrankaAbbFlexiblePackingEnvironment(ExampleEnvironmentBase):
             embodiment=embodiment,
             scene=scene,
             task=NoTask(),
+            teleop_device=teleop_device,
         )
 
     @staticmethod
     def add_cli_args(parser: argparse.ArgumentParser) -> None:
-        """Keep the legacy external-environment CLI extension point."""
+        """Add the teleoperation device selection argument."""
+        parser.add_argument(
+            "--teleop_device",
+            type=str,
+            default="keyboard",
+            choices=("keyboard", "spacemouse", "openxr"),
+            help="Teleoperation device name.",
+        )
