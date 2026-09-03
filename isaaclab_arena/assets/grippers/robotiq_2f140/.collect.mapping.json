@@ -1,0 +1,83 @@
+{
+    "version": "1.0",
+    "file_records": [
+        {
+            "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/Robotiq/2F-140/.thumbs/2f140_instanceable.thumb.usd",
+            "source_hash": "74d09cf7ba8c58f44fa7b8d7674bf52e1c3ea146",
+            "target_url": "./2f140_instanceable.thumb.usd",
+            "target_hash": "fa0d740cab0c6dc28029e1f02e1d0c7010ef455d"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/Robotiq/2F-140/2f140_instanceable.usd",
+            "source_hash": "34b4732e6e67b93e844aee7e48fe5b105f75c46a",
+            "target_url": "./2f140_instanceable.usd",
+            "target_hash": "9d2ef3f34c8a5ded32452bc9cdba6df8ae7e386f"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/Robotiq/2F-140/Props/instanceable_meshes.usd",
+            "source_hash": "2ccd9482d078f36203c9d41e7a8c501d535b7084",
+            "target_url": "./instanceable_meshes.usd",
+            "target_hash": "9fac42bb80f761e24e23de7422b536f2df44c07b"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/Robotiq/2F-140/.thumbs/Robotiq_2F_140_base.thumb.usd",
+            "source_hash": "1a76e106278849cb7aedf98ffab9c3c409697678",
+            "target_url": "./Robotiq_2F_140_base.thumb.usd",
+            "target_hash": "2df90f6424a46a21a051dbeb92bdfae8695b7a46"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/Robotiq/2F-140/.thumbs/Robotiq_2F_140_config.thumb.usd",
+            "source_hash": "21338bab54458c6f2657dc34ef2b7375fe33244d",
+            "target_url": "./Robotiq_2F_140_config.thumb.usd",
+            "target_hash": "40ac31bc6ae02b4117f58834c2cd80576077f17c"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/Robotiq/2F-140/Robotiq_2F_140_config.usd",
+            "source_hash": "8e1fa9fa44406c64632bb8c20b95e1b8c282a3f5",
+            "target_url": "./Robotiq_2F_140_config.usd",
+            "target_hash": "559c64a05544511dacdc39d3f581ebbefc7410ec"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/Robotiq/2F-140/Robotiq_2F_140_controller.usd",
+            "source_hash": "181205d01d99ce63888e21ec2962395b731ccaea",
+            "target_url": "./Robotiq_2F_140_controller.usd",
+            "target_hash": "f6542fb81f1af69a7d83ee09e07ecc036e282d7b"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/Robotiq/2F-140/.thumbs/Robotiq_2F_140_controller.thumb.usd",
+            "source_hash": "b404a87ea0d432096fbd256dbcd1e23880d919bd",
+            "target_url": "./Robotiq_2F_140_controller.thumb.usd",
+            "target_hash": "b77d87fbc513ccac3290cd05e8a164f5bebea9bd"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/Robotiq/2F-140/.thumbs/Robotiq_2F_140_physics_edit.thumb.usd",
+            "source_hash": "cecf207e5a620c605e9a0320422052d0b279ebd0",
+            "target_url": "./Robotiq_2F_140_physics_edit.thumb.usd",
+            "target_hash": "06292ae5b40647781a2eb199ab323555b85f611d"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/Robotiq/2F-140/Collected_2f140_instanceable/.thumbs/2f140_instanceable.thumb.usd",
+            "source_hash": "d73dda98b63361b3c1cd300baaf4298984c86050",
+            "target_url": "./2f140_instanceable.thumb.usd",
+            "target_hash": "964c4bac9ebce9143201e81037e0a9d2fb0eb8d2"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/Robotiq/2F-140/Collected_2f140_instanceable/2f140_instanceable.usd",
+            "source_hash": "34b4732e6e67b93e844aee7e48fe5b105f75c46a",
+            "target_url": "./2f140_instanceable.usd",
+            "target_hash": "fd5d77b1349f593666527f59026ab276ffd80a37"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/Robotiq/2F-140/Collected_2f140_instanceable/Props/instanceable_meshes.usd",
+            "source_hash": "2ccd9482d078f36203c9d41e7a8c501d535b7084",
+            "target_url": "./instanceable_meshes.usd",
+            "target_hash": "2c91c077728205c4c670eb1a7b80f0ebd65ce499"
+        },
+        {
+            "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/Robotiq/2F-140/configuration/.thumbs/Robotiq_2F_140_robot.thumb.usd",
+            "source_hash": "b775a5f6edf7b485ee473b7dee6306c40b9545b5",
+            "target_url": "./Robotiq_2F_140_robot.thumb.usd",
+            "target_hash": "18e4b08957bbf3e646f2141a83d1eed650d3f3f3"
+        }
+    ]
+}

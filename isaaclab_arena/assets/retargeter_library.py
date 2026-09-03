@@ -126,6 +126,42 @@ class FrankaSpaceMouseRetargeter(RetargetterBase):
 
 
 @register_retargeter
+class ABBIRB1200SpaceMouseRetargeter(RetargetterBase):
+    device = "spacemouse"
+    embodiment = "abb_irb1200_ik"
+
+    def __init__(self):
+        pass
+
+    def get_pipeline_builder(self, embodiment: object) -> Callable | None:
+        return None
+
+
+@register_retargeter
+class ABBIRB1200KeyboardRetargeter(RetargetterBase):
+    device = "keyboard"
+    embodiment = "abb_irb1200_ik"
+
+    def __init__(self):
+        pass
+
+    def get_pipeline_builder(self, embodiment: object) -> Callable | None:
+        return None
+
+
+@register_retargeter
+class SimpleURDFArmSpaceMouseRetargeter(RetargetterBase):
+    device = "spacemouse"
+    embodiment = "simple_urdf_arm_ik"
+
+    def __init__(self):
+        pass
+
+    def get_pipeline_builder(self, embodiment: object) -> Callable | None:
+        return None
+
+
+@register_retargeter
 class DroidDifferentialIKKeyboardRetargeter(RetargetterBase):
     device = "keyboard"
     embodiment = "droid_differential_ik"
