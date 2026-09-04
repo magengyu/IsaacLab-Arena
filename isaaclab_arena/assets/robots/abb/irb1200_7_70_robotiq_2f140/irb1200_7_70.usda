@@ -60,6 +60,12 @@ def Xform "abb_irb1200_7_70" (
                                                     )
                                                     {
                                                         bool physxRigidBody:disableGravity = 1
+
+                                                        over "collision"
+                                                        {
+                                                            bool physics:collisionEnabled = 0
+                                                            token visibility = "invisible"
+                                                        }
                                                     }
 
                                                     over "left_outer_knuckle" (
@@ -67,6 +73,12 @@ def Xform "abb_irb1200_7_70" (
                                                     )
                                                     {
                                                         bool physxRigidBody:disableGravity = 1
+
+                                                        over "collision"
+                                                        {
+                                                            bool physics:collisionEnabled = 0
+                                                            token visibility = "invisible"
+                                                        }
                                                     }
 
                                                     over "right_outer_knuckle" (
@@ -74,6 +86,12 @@ def Xform "abb_irb1200_7_70" (
                                                     )
                                                     {
                                                         bool physxRigidBody:disableGravity = 1
+
+                                                        over "collision"
+                                                        {
+                                                            bool physics:collisionEnabled = 0
+                                                            token visibility = "invisible"
+                                                        }
                                                     }
 
                                                     over "left_outer_finger" (
@@ -81,6 +99,12 @@ def Xform "abb_irb1200_7_70" (
                                                     )
                                                     {
                                                         bool physxRigidBody:disableGravity = 1
+
+                                                        over "collision"
+                                                        {
+                                                            bool physics:collisionEnabled = 0
+                                                            token visibility = "invisible"
+                                                        }
                                                     }
 
                                                     over "right_outer_finger" (
@@ -88,6 +112,12 @@ def Xform "abb_irb1200_7_70" (
                                                     )
                                                     {
                                                         bool physxRigidBody:disableGravity = 1
+
+                                                        over "collision"
+                                                        {
+                                                            bool physics:collisionEnabled = 0
+                                                            token visibility = "invisible"
+                                                        }
                                                     }
 
                                                     over "left_inner_finger" (
@@ -95,6 +125,13 @@ def Xform "abb_irb1200_7_70" (
                                                     )
                                                     {
                                                         bool physxRigidBody:disableGravity = 1
+
+                                                        over "collision"
+                                                        {
+                                                            bool physics:collisionEnabled = 0
+                                                            token visibility = "invisible"
+                                                        }
+
                                                     }
 
                                                     over "right_inner_finger" (
@@ -102,6 +139,13 @@ def Xform "abb_irb1200_7_70" (
                                                     )
                                                     {
                                                         bool physxRigidBody:disableGravity = 1
+
+                                                        over "collision"
+                                                        {
+                                                            bool physics:collisionEnabled = 0
+                                                            token visibility = "invisible"
+                                                        }
+
                                                     }
 
                                                     over "left_inner_finger_pad" (
@@ -109,6 +153,13 @@ def Xform "abb_irb1200_7_70" (
                                                     )
                                                     {
                                                         bool physxRigidBody:disableGravity = 1
+
+                                                        over "collision"
+                                                        {
+                                                            bool physics:collisionEnabled = 0
+                                                            token visibility = "invisible"
+                                                        }
+
                                                     }
 
                                                     over "right_inner_finger_pad" (
@@ -116,6 +167,13 @@ def Xform "abb_irb1200_7_70" (
                                                     )
                                                     {
                                                         bool physxRigidBody:disableGravity = 1
+
+                                                        over "collision"
+                                                        {
+                                                            bool physics:collisionEnabled = 0
+                                                            token visibility = "invisible"
+                                                        }
+
                                                     }
 
                                                 }

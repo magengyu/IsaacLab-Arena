@@ -14,6 +14,7 @@ Controls follow Isaac Lab's Se3Keyboard convention:
 
 import argparse
 import contextlib
+from pathlib import Path
 import time
 import traceback
 
@@ -46,13 +47,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--hold_gripper_open",
         action=argparse.BooleanOptionalAction,
-        default=True,
+        default=False,
         help="Hold all Robotiq joints open for Newton stability instead of commanding gripper open/close.",
     )
     parser.add_argument(
         "--direct_gripper",
         action=argparse.BooleanOptionalAction,
-        default=False,
+        default=True,
         help="Drive Robotiq joints directly in Newton instead of relying on mimic/finger_joint only.",
     )
     parser.add_argument(
@@ -66,6 +67,11 @@ def parse_args() -> argparse.Namespace:
         help="Print raw keyboard actions, processed actions, and link_6 motion diagnostics.",
     )
     parser.add_argument(
+        "--debug_gripper_stage",
+        action="store_true",
+        help="Print Robotiq gripper prim paths that exist in the composed USD stage.",
+    )
+    parser.add_argument(
         "--control_mode",
         choices=("joint_direct", "joint_relative", "ik"),
         default="joint_direct",
@@ -77,6 +83,49 @@ def parse_args() -> argparse.Namespace:
         default=0.025,
         help="Radians added to a driven ABB joint per keyboard tick in joint_direct mode.",
     )
+    parser.add_argument(
+        "--gripper_step_scale",
+        type=float,
+        default=0.02,
+        help="Radians moved toward the Robotiq open/close pose per simulation step in direct_gripper mode.",
+    )
+    parser.add_argument(
+        "--world_gravity",
+        type=float,
+        default=-9.81,
+        help="World gravity along z. The robot is held by direct joint writes in joint_direct mode.",
+    )
+    parser.add_argument(
+        "--gripper_proxy_colliders",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Add Newton-friendly runtime box colliders on Robotiq fingertip links before the first simulation step.",
+    )
+    parser.add_argument(
+        "--show_gripper_proxy_colliders",
+        action="store_true",
+        help="Show Robotiq proxy colliders for visual debugging.",
+    )
+    parser.add_argument(
+        "--disable_original_gripper_collisions",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Disable Robotiq's original complex collision meshes when using proxy fingertip colliders.",
+    )
+    parser.add_argument(
+        "--no_disable_original_gripper_collisions",
+        dest="disable_original_gripper_collisions",
+        action="store_false",
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--proxy_pad_offset",
+        type=float,
+        nargs=3,
+        default=None,
+        metavar=("X", "Y", "Z"),
+        help="Override local xyz offset for Robotiq pad proxy colliders.",
+    )
     parser.set_defaults(num_envs=1, visualizer=["kit"], enable_cameras=False, presets="newton")
     return parser.parse_args()
 
@@ -87,8 +136,14 @@ simulation_app = app_launcher.app
 
 
 def _find_irb1200_robotiq_usd_path() -> str:
-    from isaaclab_arena.embodiments.abb.abb_irb1200 import find_irb1200_robotiq_2f140_usd_path
+    local_repo_asset = (
+        Path(__file__).resolve().parents[2]
+        / "isaaclab_arena/assets/robots/abb/irb1200_7_70_robotiq_2f140/irb1200_7_70.usda"
+    )
+    if local_repo_asset.exists():
+        return str(local_repo_asset)
 
+    from isaaclab_arena.embodiments.abb.abb_irb1200 import find_irb1200_robotiq_2f140_usd_path
     return find_irb1200_robotiq_2f140_usd_path(require_exists=True)
 
 
@@ -108,40 +163,16 @@ _ROBOTIQ_2F140_JOINTS = [
 _ROBOTIQ_2F140_DIRECT_JOINTS = [
     "finger_joint",
     "right_outer_knuckle_joint",
-    "left_outer_finger_joint",
-    "right_outer_finger_joint",
-    "left_inner_finger_joint",
-    "right_inner_finger_joint",
-    "left_inner_finger_pad_joint",
-    "right_inner_finger_pad_joint",
-    "left_inner_knuckle_joint",
-    "right_inner_knuckle_joint",
 ]
 
 _ROBOTIQ_2F140_DIRECT_OPEN_POSE = {
     "finger_joint": 0.0,
     "right_outer_knuckle_joint": 0.0,
-    "left_outer_finger_joint": 0.0,
-    "right_outer_finger_joint": 0.0,
-    "left_inner_finger_joint": 0.0,
-    "right_inner_finger_joint": 0.0,
-    "left_inner_finger_pad_joint": 0.0,
-    "right_inner_finger_pad_joint": 0.0,
-    "left_inner_knuckle_joint": 0.0,
-    "right_inner_knuckle_joint": 0.0,
 }
 
 _ROBOTIQ_2F140_DIRECT_CLOSE_POSE = {
     "finger_joint": 0.8,
     "right_outer_knuckle_joint": 0.8,
-    "left_outer_finger_joint": 0.0,
-    "right_outer_finger_joint": 0.0,
-    "left_inner_finger_joint": 0.0,
-    "right_inner_finger_joint": 0.0,
-    "left_inner_finger_pad_joint": 0.0,
-    "right_inner_finger_pad_joint": 0.0,
-    "left_inner_knuckle_joint": -0.8,
-    "right_inner_knuckle_joint": -0.8,
 }
 
 
@@ -158,6 +189,173 @@ def _write_joint_pose_and_zero_velocity(robot_articulation, joint_ids, joint_tar
     )
 
 
+def _move_targets_toward(current, target, max_step: float):
+    import torch
+
+    delta = torch.clamp(target - current, min=-max_step, max=max_step)
+    return current + delta
+
+
+def _manual_env_step(env) -> None:
+    for _ in range(env.unwrapped.cfg.decimation):
+        env.unwrapped.scene.write_data_to_sim()
+        env.unwrapped.sim.step(render=False)
+        env.unwrapped.scene.update(dt=env.unwrapped.physics_dt)
+    if env.unwrapped.sim.is_rendering:
+        env.unwrapped.sim.render(skip_app_pumping=False)
+
+
+def _robotiq_proxy_paths() -> tuple[str, str]:
+    gripper_root = (
+        "/World/envs/env_0/Robot/Geometry/base_link/link_1/link_2/link_3/link_4/link_5/link_6/"
+        "robotiq_2f140_mount"
+    )
+    return (
+        f"{gripper_root}/left_inner_finger/newton_proxy_pad",
+        f"{gripper_root}/right_inner_finger/newton_proxy_pad",
+    )
+
+
+def _add_robotiq_proxy_colliders(stage, sim_utils) -> None:
+    from pxr import Gf, UsdGeom, UsdPhysics
+    from isaaclab.sim import schemas
+    from isaaclab_newton.sim.schemas import NewtonCollisionPropertiesCfg
+
+    gripper_root = (
+        "/World/envs/env_0/Robot/Geometry/base_link/link_1/link_2/link_3/link_4/link_5/link_6/"
+        "robotiq_2f140_mount"
+    )
+    material_path = "/World/Physics/RobotiqNewtonGripMaterial"
+    material_cfg = sim_utils.RigidBodyMaterialCfg(
+        static_friction=12.0,
+        dynamic_friction=10.0,
+        restitution=0.0,
+    )
+    material_cfg.func(material_path, material_cfg)
+
+    disabled_collisions = 0
+    if args_cli.disable_original_gripper_collisions:
+        for prim in stage.Traverse():
+            prim_path = str(prim.GetPath())
+            if not prim_path.startswith(gripper_root) or "newton_proxy" in prim_path:
+                continue
+            if prim.HasAPI(UsdPhysics.CollisionAPI):
+                UsdPhysics.CollisionAPI(prim).CreateCollisionEnabledAttr(False)
+                disabled_collisions += 1
+
+    proxy_specs = (
+        ("left_inner_finger", "Fingertip_01", "newton_proxy_pad", (0.026, 0.009, 0.028), (0.075, 0.0, 0.0)),
+        ("right_inner_finger", "Fingertip_01", "newton_proxy_pad", (0.026, 0.009, 0.028), (0.075, 0.0, 0.0)),
+    )
+    created = []
+    for link_name, fingertip_name, proxy_name, scale, translate in proxy_specs:
+        link_path = f"{gripper_root}/{link_name}"
+        link_prim = stage.GetPrimAtPath(link_path)
+        if not link_prim.IsValid():
+            print(f"[WARN] Robotiq proxy collider parent missing: {link_path}")
+            continue
+        fingertip_prim = stage.GetPrimAtPath(f"{link_path}/{fingertip_name}")
+        if fingertip_prim.IsValid():
+            with contextlib.suppress(Exception):
+                parent_world = UsdGeom.Xformable(link_prim).ComputeLocalToWorldTransform(0.0)
+                tip_world = UsdGeom.Xformable(fingertip_prim).ComputeLocalToWorldTransform(0.0)
+                tip_local = tip_world * parent_world.GetInverse()
+                tip_translate = tip_local.ExtractTranslation()
+                translate = (
+                    float(tip_translate[0]) + translate[0],
+                    float(tip_translate[1]) + translate[1],
+                    float(tip_translate[2]) + translate[2],
+                )
+        proxy_path = f"{link_path}/{proxy_name}"
+        cube = UsdGeom.Cube.Define(stage, proxy_path)
+        cube.CreateSizeAttr(1.0)
+        cube.CreateVisibilityAttr(UsdGeom.Tokens.invisible)
+        cube.CreateDisplayColorAttr([(1.0, 0.85, 0.05)])
+        cube.AddTranslateOp().Set(Gf.Vec3d(*translate))
+        cube.AddScaleOp().Set(Gf.Vec3f(*scale))
+        UsdPhysics.CollisionAPI.Apply(cube.GetPrim())
+        schemas.define_collision_properties(
+            proxy_path,
+            NewtonCollisionPropertiesCfg(contact_margin=0.0015, contact_gap=0.001),
+        )
+        with contextlib.suppress(Exception):
+            sim_utils.bind_physics_material(proxy_path, material_path, stage=stage)
+        created.append(proxy_path)
+        print(f"[INFO] Created Robotiq proxy collider: {proxy_path}, translate={translate}, scale={scale}")
+
+    print(
+        "[CHECK] Robotiq Newton proxy colliders: "
+        f"created={len(created)}, disabled_original_collision_prims={disabled_collisions}"
+    )
+
+
+def _set_proxy_collider_visibility(stage, visible: bool) -> None:
+    from pxr import UsdGeom
+
+    visibility = UsdGeom.Tokens.inherited if visible else UsdGeom.Tokens.invisible
+    changed = []
+    proxy_paths = _robotiq_proxy_paths()
+    for proxy_path in proxy_paths:
+        prim = stage.GetPrimAtPath(proxy_path)
+        if not prim.IsValid():
+            continue
+        imageable = UsdGeom.Imageable(prim)
+        if imageable:
+            imageable.CreateVisibilityAttr(visibility)
+            changed.append(str(prim.GetPath()))
+    for prim in stage.Traverse():
+        if "robotiq_2f140_mount" in str(prim.GetPath()) and "newton_proxy" in prim.GetName():
+            if str(prim.GetPath()) in changed:
+                continue
+            imageable = UsdGeom.Imageable(prim)
+            if imageable:
+                imageable.CreateVisibilityAttr(visibility)
+                changed.append(str(prim.GetPath()))
+    print(f"[CHECK] Proxy collider visibility changed: {len(changed)} prims -> {changed}")
+
+
+def _override_proxy_collider_offsets(stage, pad_offset) -> None:
+    from pxr import Gf
+
+    for proxy_path in _robotiq_proxy_paths():
+        prim = stage.GetPrimAtPath(proxy_path)
+        if not prim.IsValid():
+            continue
+        translate_attr = prim.GetAttribute("xformOp:translate")
+        if translate_attr.IsValid():
+            translate_attr.Set(Gf.Vec3d(*pad_offset))
+            print(f"[INFO] Override proxy offset: {prim.GetPath()} -> {tuple(pad_offset)}")
+    for prim in stage.Traverse():
+        if prim.GetName() != "newton_proxy_pad" or "robotiq_2f140_mount" not in str(prim.GetPath()):
+            continue
+        if str(prim.GetPath()) in _robotiq_proxy_paths():
+            continue
+        translate_attr = prim.GetAttribute("xformOp:translate")
+        if translate_attr.IsValid():
+            translate_attr.Set(Gf.Vec3d(*pad_offset))
+            print(f"[INFO] Override proxy offset: {prim.GetPath()} -> {tuple(pad_offset)}")
+
+
+def _print_gripper_stage_prims(stage) -> None:
+    gripper_root = (
+        "/World/envs/env_0/Robot/Geometry/base_link/link_1/link_2/link_3/link_4/link_5/link_6/"
+        "robotiq_2f140_mount"
+    )
+    interesting = []
+    for prim in stage.Traverse():
+        prim_path = str(prim.GetPath())
+        if not prim_path.startswith(gripper_root):
+            continue
+        lower_path = prim_path.lower()
+        if any(token in lower_path for token in ("finger", "knuckle", "pad", "collision", "proxy")):
+            interesting.append(prim_path)
+    print(f"[DEBUG] Robotiq stage prims under mount: count={len(interesting)}")
+    for prim_path in interesting[:200]:
+        print(f"[DEBUG]   {prim_path}")
+    if len(interesting) > 200:
+        print(f"[DEBUG]   ... truncated {len(interesting) - 200} more prims")
+
+
 def main() -> None:
     import torch
     from isaaclab.actuators import ImplicitActuatorCfg
@@ -167,6 +365,8 @@ def main() -> None:
     from isaaclab.utils.configclass import configclass
     from omni.usd import get_context
 
+    from isaaclab_arena.assets.object import Object
+    from isaaclab_arena.assets.object_base import ObjectType
     from isaaclab_arena.assets.registries import AssetRegistry, DeviceRegistry
     from isaaclab_arena.embodiments.droid.actions import BinaryJointPositionZeroToOneAction
     from isaaclab_arena.environments.arena_env_builder import ArenaEnvBuilder
@@ -220,10 +420,10 @@ def main() -> None:
     if args_cli.hold_gripper_open or args_cli.direct_gripper:
         robot.scene_config.robot.actuators["gripper_hold_open"] = ImplicitActuatorCfg(
             joint_names_expr=_ROBOTIQ_2F140_DIRECT_JOINTS,
-            effort_limit_sim=120.0,
-            velocity_limit_sim=1.5,
-            stiffness=80.0,
-            damping=18.0,
+            effort_limit_sim=35.0,
+            velocity_limit_sim=0.8,
+            stiffness=60.0,
+            damping=16.0,
         )
     else:
         robot.scene_config.robot.actuators["gripper"] = ImplicitActuatorCfg(
@@ -255,7 +455,22 @@ def main() -> None:
     )
     robot.action_config = ABBIRB1200RobotiqActionCfg()
     table = asset_registry.get_asset_by_name("table")()
-    cube = asset_registry.get_asset_by_name("dex_cube")()
+    cube = Object(
+        name="newton_grip_cube",
+        object_type=ObjectType.RIGID,
+        spawner_cfg=sim_utils.CuboidCfg(
+            size=(0.04, 0.04, 0.04),
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(disable_gravity=False),
+            collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.006, rest_offset=0.0),
+            mass_props=sim_utils.MassPropertiesCfg(mass=0.02),
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.1, 0.35, 0.9)),
+            physics_material=sim_utils.RigidBodyMaterialCfg(
+                static_friction=10.0,
+                dynamic_friction=8.0,
+                restitution=0.0,
+            ),
+        ),
+    )
     light = asset_registry.get_asset_by_name("light")()
 
     table.set_initial_pose(Pose(position_xyz=(0.0, 0.0, 0.0)))
@@ -287,14 +502,14 @@ def main() -> None:
         print("[INFO] Newton debug mode: keyboard commands directly update ABB joint positions.")
     env_builder = ArenaEnvBuilder(env_cfg, builder_cfg)
     manager_env_cfg, env_kwargs = env_builder.compose_manager_cfg()
-    manager_env_cfg.sim.gravity = (0.0, 0.0, 0.0)
+    manager_env_cfg.sim.gravity = (0.0, 0.0, args_cli.world_gravity)
     if manager_env_cfg.sim.physics is not None:
         manager_env_cfg.sim.physics.num_substeps = 6
         solver_cfg = getattr(manager_env_cfg.sim.physics, "solver_cfg", None)
         if solver_cfg is not None:
             solver_cfg.iterations = 150
             solver_cfg.ls_iterations = 25
-    print("[INFO] Newton debug mode: global gravity disabled for stable IK teleoperation.")
+    print(f"[INFO] Newton debug mode: world gravity set to (0.0, 0.0, {args_cli.world_gravity}).")
     env = env_builder.make_registered(manager_env_cfg, env_kwargs)
     stage = get_context().get_stage()
     print("[INFO] Environment built. Resetting...")
@@ -315,6 +530,17 @@ def main() -> None:
     print(f"[CHECK] robotiq_2f140_mount exists: {gripper_prim.IsValid()}")
     print(f"[CHECK] Robotiq base_link exists: {robotiq_base_prim.IsValid()}")
     print(f"[CHECK] Robotiq finger_joint prim exists: {robotiq_finger_joint_prim.IsValid()}")
+    if args_cli.debug_gripper_stage:
+        _print_gripper_stage_prims(stage)
+    if args_cli.gripper_proxy_colliders:
+        _add_robotiq_proxy_colliders(stage, sim_utils)
+    for proxy_path in _robotiq_proxy_paths():
+        print(f"[CHECK] USD Robotiq proxy collider exists: {proxy_path} -> {stage.GetPrimAtPath(proxy_path).IsValid()}")
+    if args_cli.proxy_pad_offset is not None:
+        _override_proxy_collider_offsets(stage, args_cli.proxy_pad_offset)
+    if args_cli.show_gripper_proxy_colliders:
+        _set_proxy_collider_visibility(stage, visible=True)
+        print("[INFO] Showing Robotiq proxy colliders for visual debugging.")
 
     robot_articulation = None
     joint_name_to_index = {}
@@ -325,6 +551,7 @@ def main() -> None:
     gripper_joint_ids = None
     gripper_open_targets = None
     gripper_close_targets = None
+    gripper_current_targets = None
     with contextlib.suppress(Exception):
         robot_articulation = env.unwrapped.scene["robot"]
         joint_name_to_index = {name: idx for idx, name in enumerate(robot_articulation.data.joint_names)}
@@ -348,7 +575,13 @@ def main() -> None:
         print(f"[INFO] ABB IRB1200 bodies: {robot_articulation.data.body_names}")
         print(f"[INFO] Robotiq direct joints: {gripper_joint_names}")
         if gripper_joint_ids and gripper_open_targets is not None:
-            _write_joint_pose_and_zero_velocity(robot_articulation, gripper_joint_ids, gripper_open_targets)
+            gripper_current_targets = gripper_open_targets.clone()
+            robot_articulation.set_joint_position_target_index(
+                target=gripper_open_targets,
+                joint_ids=gripper_joint_ids,
+            )
+            if args_cli.hold_gripper_open:
+                _write_joint_pose_and_zero_velocity(robot_articulation, gripper_joint_ids, gripper_open_targets)
         if arm_joint_ids and direct_joint_targets is not None and args_cli.control_mode == "joint_direct":
             _write_joint_pose_and_zero_velocity(robot_articulation, arm_joint_ids, direct_joint_targets)
         env.unwrapped.scene.write_data_to_sim()
@@ -396,7 +629,11 @@ def main() -> None:
                     if robot_articulation is not None and arm_joint_ids is not None:
                         direct_joint_targets = robot_articulation.data.joint_pos.torch[:, arm_joint_ids].clone()
                     if robot_articulation is not None and gripper_joint_ids is not None and gripper_open_targets is not None:
-                        _write_joint_pose_and_zero_velocity(robot_articulation, gripper_joint_ids, gripper_open_targets)
+                        gripper_current_targets = gripper_open_targets.clone()
+                        robot_articulation.set_joint_position_target_index(
+                            target=gripper_open_targets,
+                            joint_ids=gripper_joint_ids,
+                        )
                     teleop_interface.reset()
                     simulation_app.update()
                     print("[INFO] Reset complete.")
@@ -472,19 +709,33 @@ def main() -> None:
                         and robot_articulation is not None
                         and gripper_joint_ids is not None
                         and gripper_open_targets is not None
+                        and gripper_current_targets is not None
                     ):
                         if args_cli.hold_gripper_open:
-                            gripper_targets = gripper_open_targets
+                            gripper_desired_targets = gripper_open_targets
                         elif raw_action[6].item() < 0.0 and gripper_close_targets is not None:
-                            gripper_targets = gripper_close_targets
+                            gripper_desired_targets = gripper_close_targets
                         else:
-                            gripper_targets = gripper_open_targets
+                            gripper_desired_targets = gripper_open_targets
+                        gripper_current_targets = _move_targets_toward(
+                            gripper_current_targets,
+                            gripper_desired_targets,
+                            args_cli.gripper_step_scale,
+                        )
                         robot_articulation.set_joint_position_target_index(
-                            target=gripper_targets,
+                            target=gripper_current_targets,
                             joint_ids=gripper_joint_ids,
                         )
-                        _write_joint_pose_and_zero_velocity(robot_articulation, gripper_joint_ids, gripper_targets)
-                    env.step(action)
+                        if args_cli.hold_gripper_open:
+                            _write_joint_pose_and_zero_velocity(
+                                robot_articulation,
+                                gripper_joint_ids,
+                                gripper_current_targets,
+                            )
+                    if args_cli.control_mode == "ik":
+                        env.step(action)
+                    else:
+                        _manual_env_step(env)
                     if (
                         args_cli.control_mode == "joint_direct"
                         and robot_articulation is not None
@@ -497,8 +748,18 @@ def main() -> None:
                         and robot_articulation is not None
                         and gripper_joint_ids is not None
                         and gripper_open_targets is not None
+                        and gripper_current_targets is not None
                     ):
-                        _write_joint_pose_and_zero_velocity(robot_articulation, gripper_joint_ids, gripper_targets)
+                        robot_articulation.set_joint_position_target_index(
+                            target=gripper_current_targets,
+                            joint_ids=gripper_joint_ids,
+                        )
+                        if args_cli.hold_gripper_open:
+                            _write_joint_pose_and_zero_velocity(
+                                robot_articulation,
+                                gripper_joint_ids,
+                                gripper_current_targets,
+                            )
                     if args_cli.debug_actions and robot_articulation is not None and link6_body_index is not None:
                         link6_pos = robot_articulation.data.body_pos_w.torch[0, link6_body_index].detach().clone()
                         if last_link6_pos is None:
